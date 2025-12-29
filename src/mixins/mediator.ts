@@ -14,13 +14,3 @@ export const mediator = (publish: EventPublisher) =>
     await publish(events);
   };
 
-export const InMemoryPublisher = (handlers: Record<string, (event: any) => Promise<void>>): EventPublisher =>
-  async (events) => await Promise.all(
-    events.map(event =>
-      (
-        handlers[event.type] ?? ((e) => console.error('Invalid event', e))
-      )(event)
-    )
-  ).then()
-
-

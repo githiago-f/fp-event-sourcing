@@ -1,95 +1,10 @@
-import { randomUUID } from "node:crypto";
-import { aggregateRoot, Applier } from "./mixins/aggregate";
-import { monetary, Monetary } from "./monetary";
+import { Events } from "./domain/entities";
+import { invoice, invoiceAggregate } from "./domain/invoice-aggregate";
+import { monetary } from "./domain/monetary";
+import { BaseEvent } from "./mixins/aggregate";
+import { EventPublisher, mediator } from "./mixins/mediator";
 
-const invoiceStatus = {
-  new: 'new',
-  processing: 'processing',
-  refused: 'refused',
-  active: 'active',
-  cancelled: 'cancelled',
-} as const;
-
-const chargeStatus = {
-  paid: 'paid',
-  cancelled: 'cancelled',
-  approved: 'approved',
-  refunded: 'refunded',
-  billed: 'billed',
-  created: 'created',
-} as const;
-
-type ChargeStatusType = typeof chargeStatus;
-type ChargeStatus = keyof ChargeStatusType;
-type InvoiceStatusType = typeof invoiceStatus;
-type InvoiceStatus = keyof InvoiceStatusType;
-
-type Month = `0${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}` | '11' | '12';
-type ReferenceMonth = `${string}/${Month}`;
-
-type Charge = {
-  invoice: string,
-  status: ChargeStatus,
-  paidAmount: Monetary,
-  referenceMonth: ReferenceMonth;
-}
-
-type Product = {
-  id: string,
-  code: string,
-  price: Monetary,
-}
-
-type Invoice = {
-  id: string,
-  contractAccountNumber: string,
-  status: InvoiceStatus,
-}
-
-type InvoiceAggregate = Invoice & {
-  product: { id: string, sellingPrice: Monetary },
-  charges: Charge[],
-}
-
-type InvoiceCreatedEvent = { product: Product, sellingPrice: number, caNumber: string }
-
-const Events = {
-  invoice_created: 'invoice_created',
-  product_price_changed: 'product_price_changed',
-  paid_charge: 'paid_charge',
-} as const;
-
-const invoiceCreatedHandler: Applier<InvoiceAggregate, InvoiceCreatedEvent> = (curr, i) => {
-  curr.product = {
-    id: i.product.id,
-    sellingPrice: monetary(i.sellingPrice),
-  };
-
-  curr.id = randomUUID();
-  curr.contractAccountNumber = i.caNumber;
-  curr.status = invoiceStatus.new;
-  return curr;
-}
-
-const paidChargeHandler: Applier<InvoiceAggregate, { paidAmount: Monetary, charge: { product: string } }> = (curr) => {
-  return curr;
-}
-
-const invoiceAggregate = (initialData: InvoiceCreatedEvent) => {
-  const base = aggregateRoot({
-    [Events.invoice_created]: invoiceCreatedHandler,
-    [Events.paid_charge]: paidChargeHandler,
-  })().putEvent({
-    eventType: 'invoice_created',
-    data: initialData
-  });
-
-  return {
-    ...base,
-  }
-}
-
-const sold = invoiceAggregate({
+const eventData = {
   caNumber: 'ca23142',
   product: {
     id: 'id#123',
@@ -97,8 +12,34 @@ const sold = invoiceAggregate({
     price: monetary(20.93)
   },
   sellingPrice: 19.99
+}
+const newInvoice = invoice(invoiceAggregate().putEvent({ eventType: 'invoice_created', data: eventData }));
+
+const checkpointInvoice = invoice(invoiceAggregate(newInvoice));
+
+console.log({ newInvoice, checkpointInvoice });
+console.log(newInvoice.peekChanges());
+
+const cancelled = checkpointInvoice.cancel();
+
+console.log({ cancelled });
+console.log(cancelled.peekChanges());
+
+type Handlers = Record<string, (event: any) => Promise<void>>;
+export const InMemoryPublisher = (handlers: Handlers): EventPublisher => async (es) => {
+  const handler = (type: string) => handlers[type] ?? ((e) => console.error('Invalid event', e));
+  const result = es.map(e => handler(e.type)(e));
+  await Promise.all(result);
+}
+
+const publisher = InMemoryPublisher({
+  [Events.invoice_created]: async (event) => console.log('Invoice created ->', event),
 });
 
-console.log(sold);
-console.log(sold.peekChanges());
+const emit = (events: readonly BaseEvent<any, any>[]) => {
+  const es = events.map(e => ({ type: e.eventType, id: 'group-id', data: e.data }));
+  return mediator(publisher)(es);
+}
+
+emit(cancelled.peekChanges());
 

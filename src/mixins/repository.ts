@@ -1,29 +1,24 @@
 export interface DataSource {
-  findBy<K extends PropertyKey, V, T>(key: K, value: V): Promise<T[]>;
-  save<T>(entity: T): Promise<void>;
-  delete<T>(entity: T): Promise<void>;
+  save<E>(entity: E): Promise<void>;
+  delete<E>(entity: E): Promise<void>;
+  findById<PK, E>(identity: PK): Promise<E | E[]>;
 }
 
-export interface Repository<T> {
+export interface WriteRepository<E, PK> {
+  save(entity: E): Promise<E>;
+  delete(identity: E | PK): Promise<void>;
+  update(identity: PK, entity: Partial<E>): Promise<E>;
 }
 
-export const repository = <T>(ds: DataSource): Repository<T> => ({
+export const writeRepository = <E, PK>(ds: DataSource): WriteRepository<E, PK> => ({
+  delete: (identity) => ds.delete(identity),
+  save: (entity) => ds.save(entity).then(() => entity),
+  update: async (identity, entity) => {
+    const entities = await ds.findById(identity);
+    const current = Array.isArray(entities) ? entities[0] : entities;
+    const data = { ...current, ...entity };
+    await ds.save(data);
+    return data;
+  },
 });
-
-const dataSource: DataSource = {
-  async findBy(_, __) { return []; },
-  async delete(_) { },
-  async save(_) { }
-}
-
-const userRepository = (ds: DataSource) => {
-  const base = repository(ds);
-
-  return {
-    ...base,
-    findByName(name: string) {
-      return ds.findBy('name', name);
-    }
-  }
-}
 
