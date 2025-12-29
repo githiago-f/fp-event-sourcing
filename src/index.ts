@@ -1,7 +1,7 @@
 import { Events } from "./domain/entities";
 import { invoice, invoiceAggregate } from "./domain/invoice-aggregate";
 import { monetary } from "./domain/monetary";
-import { BaseEvent } from "./mixins/aggregate";
+import { Aggregate } from "./mixins/aggregate";
 import { EventPublisher, mediator } from "./mixins/mediator";
 
 const eventData = {
@@ -36,10 +36,15 @@ const publisher = InMemoryPublisher({
   [Events.invoice_created]: async (event) => console.log('Invoice created ->', event),
 });
 
-const emit = (events: readonly BaseEvent<any, any>[]) => {
-  const es = events.map(e => ({ type: e.eventType, id: 'group-id', data: e.data }));
-  return mediator(publisher)(es);
+const emit = (agg: Aggregate<any, any, any>) => {
+  const es = agg.peekChanges()
+    .map((e: any) => ({ type: e.eventType, id: 'group-id', data: e.data }));
+  mediator(publisher)(es);
+  return agg.commit();
 }
 
-emit(cancelled.peekChanges());
+const emited = emit(cancelled);
+const emited2 = emit(newInvoice);
+
+console.log({ emmited: emited, emmited2: emited2 });
 
