@@ -1,8 +1,10 @@
 import { Events } from "./domain/entities";
 import { invoice, makeAggregate } from "./domain/invoice-aggregate";
 import { monetary } from "./domain/monetary";
-import { Aggregate } from "./mixins/aggregate";
+import { BaseEvent } from "./mixins/aggregate";
+import { aggregateService } from "./mixins/aggregate-service";
 import { EventPublisher, mediator } from "./mixins/mediator";
+import { writeRepository } from "./mixins/repository";
 
 const eventData = {
   data: {
@@ -17,17 +19,10 @@ const eventData = {
   eventType: Events.invoice_created,
 };
 
-const newInvoice = invoice(makeAggregate().putEvent(eventData));
+const replayableInvoice = invoice(makeAggregate().putEvent(eventData));
 
-const checkpointInvoice = invoice(makeAggregate(newInvoice));
-
-console.log({ newInvoice, checkpointInvoice });
-console.log(newInvoice.peekChanges());
-
+const checkpointInvoice = invoice(makeAggregate(replayableInvoice));
 const cancelled = checkpointInvoice.cancel();
-
-console.log({ cancelled });
-console.log(cancelled.peekChanges());
 
 type Handlers = Record<string, (event: any) => Promise<void>>;
 export const InMemoryPublisher = (handlers: Handlers): EventPublisher => async (es) => {
@@ -40,15 +35,16 @@ const publisher = InMemoryPublisher({
   [Events.invoice_created]: async (event) => console.log('Invoice created ->', event),
 });
 
-const sendEvent = (agg: Aggregate<any, any, any>) => {
-  const es = agg.peekChanges()
-    .map((e: any) => ({ type: e.eventType, id: 'group-id', data: e.data }));
-  mediator(publisher)(es);
-  return agg.commit();
-}
+const emitter = mediator(publisher);
+const eventStore = writeRepository<BaseEvent<any, any>, string>({
+  async save(_) { },
+  async delete(_) { },
+  async findById(_) { return []; },
+});
 
-const emited = sendEvent(newInvoice);
-const emited2 = sendEvent(cancelled);
+const verySimpleHash = (s: string) => s.split('').map(i => i.charCodeAt(0)).reduce((acc, i) => { acc += i; return acc; }, 0).toString(16);
+const service = aggregateService(eventStore, emitter, (id, event) => id + verySimpleHash(JSON.stringify(event.data)));
 
-console.log({ emited, emited2 });
+service.commit(replayableInvoice);
+service.commit(cancelled);
 

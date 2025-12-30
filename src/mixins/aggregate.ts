@@ -9,9 +9,10 @@ export interface Applier<T = any, E = any> {
 
 export type Aggregate<T, eventKey extends PropertyKey, E> = Readonly<
   T & {
+    id: string,
     commit(): Aggregate<T, eventKey, E>;
     putEvent<K extends eventKey>(event: BaseEvent<K, E extends any ? E : never>): Aggregate<T, eventKey, E>;
-    peekChanges(): readonly BaseEvent<eventKey, E>[];
+    peekChanges(): BaseEvent<eventKey, E>[];
   }
 >;
 
