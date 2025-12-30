@@ -7,15 +7,15 @@ const appliers = {
   [Events.invoice_created]: invoiceCreatedHandler,
 }
 
-export const invoiceAggregate = aggregateRoot(appliers);
+export const makeAggregate = aggregateRoot(appliers);
 
-export const invoice = (agg = invoiceAggregate()) => ({
+export const invoice = (agg = makeAggregate()) => ({
   ...agg,
   putEvent: (e: Parameters<typeof agg.putEvent>[0]) => invoice(agg.putEvent(e)),
   commit: () => invoice(agg.commit()),
   cancel: () => invoice(agg.putEvent({
     eventType: Events.invoice_cancelled,
     data: {},
-  })),
+  }))
 });
 

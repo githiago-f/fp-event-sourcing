@@ -11,5 +11,5 @@ export const monetary = (decimal: number, currency = 'BRL'): Monetary => {
     value,
     decimal,
     currency,
-  } as const);
+  });
 }

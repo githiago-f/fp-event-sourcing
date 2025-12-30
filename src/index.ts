@@ -1,21 +1,25 @@
 import { Events } from "./domain/entities";
-import { invoice, invoiceAggregate } from "./domain/invoice-aggregate";
+import { invoice, makeAggregate } from "./domain/invoice-aggregate";
 import { monetary } from "./domain/monetary";
 import { Aggregate } from "./mixins/aggregate";
 import { EventPublisher, mediator } from "./mixins/mediator";
 
 const eventData = {
-  caNumber: 'ca23142',
-  product: {
-    id: 'id#123',
-    code: 'billing-code',
-    price: monetary(20.93)
+  data: {
+    caNumber: 'ca23142',
+    product: {
+      id: 'id#123',
+      code: 'billing-code',
+      price: monetary(20.93)
+    },
+    sellingPrice: 19.99
   },
-  sellingPrice: 19.99
-}
-const newInvoice = invoice(invoiceAggregate().putEvent({ eventType: 'invoice_created', data: eventData }));
+  eventType: Events.invoice_created,
+};
 
-const checkpointInvoice = invoice(invoiceAggregate(newInvoice));
+const newInvoice = invoice(makeAggregate().putEvent(eventData));
+
+const checkpointInvoice = invoice(makeAggregate(newInvoice));
 
 console.log({ newInvoice, checkpointInvoice });
 console.log(newInvoice.peekChanges());
@@ -36,15 +40,15 @@ const publisher = InMemoryPublisher({
   [Events.invoice_created]: async (event) => console.log('Invoice created ->', event),
 });
 
-const emit = (agg: Aggregate<any, any, any>) => {
+const sendEvent = (agg: Aggregate<any, any, any>) => {
   const es = agg.peekChanges()
     .map((e: any) => ({ type: e.eventType, id: 'group-id', data: e.data }));
   mediator(publisher)(es);
   return agg.commit();
 }
 
-const emited = emit(cancelled);
-const emited2 = emit(newInvoice);
+const emited = sendEvent(newInvoice);
+const emited2 = sendEvent(cancelled);
 
-console.log({ emmited: emited, emmited2: emited2 });
+console.log({ emited, emited2 });
 

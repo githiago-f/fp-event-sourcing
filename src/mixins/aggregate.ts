@@ -42,7 +42,7 @@ export function aggregateRoot<
       commit,
       putEvent,
       peekChanges,
-    } as const;
+    };
   };
 
   return aggregatePrototype;
