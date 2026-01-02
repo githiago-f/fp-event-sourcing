@@ -42,8 +42,8 @@ const eventStore = writeRepository<BaseEvent<any, any>, string>({
   async findById(_) { return []; },
 });
 
-const verySimpleHash = (s: string) => s.split('').map(i => i.charCodeAt(0)).reduce((acc, i) => { acc += i; return acc; }, 0).toString(16);
-const service = aggregateService(eventStore, emitter, (id, event) => id + verySimpleHash(JSON.stringify(event.data)));
+const idGenerator = (id: string, event: any) => id + event.eventType;
+const service = aggregateService(eventStore, emitter, idGenerator);
 
 service.commit(replayableInvoice);
 service.commit(cancelled);
