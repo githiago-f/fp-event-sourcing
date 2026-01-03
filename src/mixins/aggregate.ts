@@ -16,9 +16,7 @@ export type Aggregate<T, eventKey extends PropertyKey, E> = Readonly<
   }
 >;
 
-export function aggregateRoot<
-  A extends Record<PropertyKey, Applier>
->(appliers: A) {
+export function aggregateRoot<A extends Record<PropertyKey, Applier>>(appliers: A) {
   type Key = keyof A;
   type T = A[Key] extends Applier<infer TT extends object, any> ? TT : object;
   type DataFor<K extends Key> = A[K] extends Applier<T, infer D> ? D : never;
