@@ -1,21 +1,19 @@
-import { aggregateRoot } from "../mixins/aggregate.ts";
-import { Events } from "./entities";
-import { invoiceCancelledHandler, invoiceCreatedHandler } from './event-appliers.ts';
+import { Aggregate } from "../mixins/aggregate";
+import { implementing, observe } from "../utils/describers";
+import { Events, InvoiceAggregate, InvoiceCreatedEvent, InvoiceEvent } from "./entities";
 
-const appliers = {
-  [Events.invoice_cancelled]: invoiceCancelledHandler,
-  [Events.invoice_created]: invoiceCreatedHandler,
-}
+type AggregateEvents<K extends InvoiceEvent> = {
+  [Events.invoice_cancelled]: {}
+  [Events.invoice_created]: InvoiceCreatedEvent
+}[K];
 
-export const makeAggregate = aggregateRoot(appliers);
+type Agg = Aggregate<InvoiceAggregate, InvoiceEvent, AggregateEvents<InvoiceEvent>>;
 
-export const invoice = (agg = makeAggregate()) => ({
-  ...agg,
-  putEvent: (e: Parameters<typeof agg.putEvent>[0]) => invoice(agg.putEvent(e)),
-  commit: () => invoice(agg.commit()),
-  cancel: () => invoice(agg.putEvent({
-    eventType: Events.invoice_cancelled,
-    data: {},
-  }))
-});
+export const invoice = observe((agg: Agg) => implementing(agg)('Invoices', {
+  cancel: () => agg.putEvent({ eventType: Events.invoice_cancelled, data: {} }).fold(invoice),
+  putEvent: (e: Parameters<typeof agg.putEvent>[0]) => agg.putEvent(e).fold(invoice),
+  commit: () => agg.commit().fold(invoice),
+  fold: undefined,
+}));
+
 
