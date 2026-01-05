@@ -1,10 +1,17 @@
 import { Events } from "./domain/entities";
-import { invoice, makeAggregate } from "./domain/invoice-aggregate";
+import { invoiceCreatedHandler, invoiceCancelledHandler } from "./domain/event-appliers";
+import { invoice } from "./domain/invoice-aggregate";
 import { monetary } from "./domain/monetary";
-import { BaseEvent } from "./mixins/aggregate";
+import { aggregateRoot, BaseEvent } from "./mixins/aggregate";
 import { aggregateService } from "./mixins/aggregate-service";
 import { EventPublisher, mediator } from "./mixins/mediator";
 import { writeRepository } from "./mixins/repository";
+import { buildSchema } from "./utils/describers";
+
+const aggregatePrototype = aggregateRoot({
+  [Events.invoice_created]: invoiceCreatedHandler,
+  [Events.invoice_cancelled]: invoiceCancelledHandler,
+});
 
 const eventData = {
   data: {
@@ -19,9 +26,9 @@ const eventData = {
   eventType: Events.invoice_created,
 };
 
-const replayableInvoice = invoice(makeAggregate().putEvent(eventData));
+const replayableInvoice = invoice(aggregatePrototype().putEvent(eventData));
 
-const checkpointInvoice = invoice(makeAggregate(replayableInvoice));
+const checkpointInvoice = invoice(aggregatePrototype(replayableInvoice));
 const cancelled = checkpointInvoice.cancel();
 
 type Handlers = Record<string, (event: any) => Promise<void>>;
@@ -48,3 +55,4 @@ const service = aggregateService(eventStore, emitter, idGenerator);
 service.commit(replayableInvoice);
 service.commit(cancelled);
 
+console.log(buildSchema());

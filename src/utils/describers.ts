@@ -69,18 +69,16 @@ export const observe = <T extends Describable>(fn: (...args: any[]) => T) =>
     return value;
   } : fn;
 
-export function buildSchema(): Schema {
-  return schemaFragments.reduce(
-    (schema, fragment) => {
-      fragment.nodes.forEach(d => {
-        schema.nodes.set(d.name, d);
-      });
-      return {
-        nodes: schema.nodes,
-        relations: [...schema.relations, ...fragment.relations]
-      };
-    },
-    { nodes: new Map(), relations: [] },
-  )
-}
+export const buildSchema = () => schemaFragments.reduce(
+  (schema, fragment) => {
+    fragment.nodes.forEach(d => {
+      schema.nodes.set(d.name, d);
+    });
+    return {
+      nodes: schema.nodes,
+      relations: [...schema.relations, ...fragment.relations]
+    };
+  },
+  { nodes: new Map(), relations: [] } as Schema,
+);
 
