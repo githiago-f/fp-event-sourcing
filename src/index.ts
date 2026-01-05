@@ -25,7 +25,7 @@ const checkpointInvoice = invoice(makeAggregate(replayableInvoice));
 const cancelled = checkpointInvoice.cancel();
 
 type Handlers = Record<string, (event: any) => Promise<void>>;
-export const InMemoryPublisher = (handlers: Handlers): EventPublisher => async (es) => {
+const InMemoryPublisher = (handlers: Handlers): EventPublisher => async (es) => {
   const handler = (type: string) => handlers[type] ?? ((e) => console.error('Invalid event', e));
   const result = es.map(e => handler(e.type)(e));
   await Promise.all(result);
